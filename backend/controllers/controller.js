@@ -29,7 +29,41 @@ export async function login(req, res) {
     res.status(500).json({ error: "Server error" });
   }
 }
+export async function register(req, res) {
+  const { username, password } = req.body;
 
+  try {
+    // Check if username already exists
+    const [rows] = await pool.query(
+      "SELECT * FROM user WHERE username = ?",
+      [username]
+    );
+
+    if (rows.length > 0) {
+      return res.status(400).json({ error: "Username already exists" });
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10); // saltRounds = 10
+
+    // Insert new user
+    const [result] = await pool.query(
+      "INSERT INTO user (username, password) VALUES (?, ?)",
+      [username, hashedPassword]
+    );
+
+    // Save session (optional)
+    req.session.user = { id: result.insertId, username };
+
+    res.status(201).json({ 
+      message: "User created successfully", 
+      user: req.session.user 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+}
 // ✅ LOGOUT
 export function logout(req, res) {
   req.session.destroy((err) => {

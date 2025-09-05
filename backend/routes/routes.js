@@ -1,5 +1,5 @@
 import express from "express";
-import { login, logout, checkSession, getUser, addRecord, addClient, getClients, getPending, getExpired, addPayment, getOffense, getViolation, getSection, addViolationList, getViolationList, getViolationOffense, getPenaltyValue, getViolationId, updateAccount } from "../controllers/controller.js";
+import { login, logout, checkSession, getUser, addRecord, addClient, getClients, getPending, getExpired, addPayment, getOffense, getViolation, getSection, addViolationList, getViolationList, getViolationOffense, getPenaltyValue, getViolationId, updateAccount, register } from "../controllers/controller.js";
 
 const router = express.Router();
 
@@ -15,6 +15,7 @@ router.post("/getViolationOffense",getViolationOffense)
 router.post("/getViolationId",getViolationId)
 router.post("/getPenaltyValue",getPenaltyValue)
 router.post("/updateAccount",updateAccount)
+router.post("/register",register)
 
 router.get("/getClient",getClients)
 router.get("/getPending",getPending)

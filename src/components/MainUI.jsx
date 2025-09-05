@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import  { useEffect, useMemo, useState, useRef  } from "react";
 import html2pdf from "html2pdf.js";
-
+import { IoIosWarning } from "react-icons/io";
+import { FaUsers } from "react-icons/fa";
+import { MdPaid } from "react-icons/md";
 function MainUI() {
   const [records, setRecords] = useState([]);
   const [pending, setPending] = useState([]);
@@ -20,6 +22,7 @@ const [offenseCounts, setOffenseCounts] = useState({});
   const [searchInput, setSearchInput] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
 const [orNumber, setOrNumber] = useState("");
+
 const [currentPage, setCurrentPage] = useState({
   all: 1,
   pending: 1,
@@ -40,6 +43,7 @@ const handleTableViewChange = (view) => {
 
 // fetch offenses when pending changes
 useEffect(() => {
+  document.title = "LMPTS | Dashboard";
   const fetchAllOffenses = async () => {
     const counts = {};
     for (let client of pending) {
@@ -85,47 +89,48 @@ const confirmPay = async () => {
     setLoading(false);
   }
 };
-  const handleViewClick = async (client) => {
-    setSelectedClient(client); 
-    setIsViewViolationOpen(true);
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/getViolationOffense", {
+
+const handleViewClick = async (client) => {
+  setSelectedClient(client); 
+  setIsViewViolationOpen(true);
+  setLoading(true);
+  setError(null);
+  try {
+    const response = await fetch("/api/getViolationOffense", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: client.name }),
+  });
+
+    if (!response.ok) throw new Error("Failed to fetch offenses");
+
+    const offenseData = await response.json();
+    console.log(offenseData)
+    console.log("Client",client)
+    // ✅ Filter only where idNo matches the client
+    const clientOffenses = offenseData.filter(
+      (offense) => offense.idNo === client.idNo
+    );
+
+    setViolations(clientOffenses); // ✅ save to state
+  
+    // Fetch penalty value
+    const penaltyResponse = await fetch("/api/getPenaltyValue", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: client.name }),
+      body: JSON.stringify({ client_idNo: client.idNo }),
     });
 
-      if (!response.ok) throw new Error("Failed to fetch offenses");
+    if (!penaltyResponse.ok) throw new Error("Failed to fetch penalty");
+    const penaltyData = await penaltyResponse.json();
 
-      const offenseData = await response.json();
-      console.log(offenseData)
-      console.log("Client",client)
-      // ✅ Filter only where idNo matches the client
-      const clientOffenses = offenseData.filter(
-        (offense) => offense.idNo === client.idNo
-      );
-
-      setViolations(clientOffenses); // ✅ save to state
-   
-      // Fetch penalty value
-      const penaltyResponse = await fetch("/api/getPenaltyValue", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_idNo: client.idNo }),
-      });
-
-      if (!penaltyResponse.ok) throw new Error("Failed to fetch penalty");
-      const penaltyData = await penaltyResponse.json();
-
-      setPenaltyValue(penaltyData? penaltyData : null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setPenaltyValue(penaltyData? penaltyData : null);
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
   
 // modal openers
 const handlePay = async () => {
@@ -136,7 +141,8 @@ const handleViewClient = (client) => {
   setSelectedClient(client);
   setShowConfirm(true)
 };
-  const handlePrintClient = async (client) => {
+
+const handlePrintClient = async (client) => {
   // Create a temporary container
    const violations = getViolations(client);
   const formattedViolations = violations.length > 0 
@@ -271,50 +277,48 @@ under Citation Ticket No. <span style="font-weight:bold;color:#000;text-decorati
 
 };
 
-    const handleCloseModal = () => {
+const handleCloseModal = () => {
   setSelectedClient(null);
   setShowConfirm(false);
   setIsViewViolationOpen(false);
 };
   
-  useEffect(() => {
-    fetchRecords().then((data) => setRecords(data || []));
-    fetchPending().then((data) => setPending(data || []));
-    fetchExpired().then((data) => setExpired(data || []));
-  }, []);
+useEffect(() => {
+  fetchRecords().then((data) => setRecords(data || []));
+  fetchPending().then((data) => setPending(data || []));
+  fetchExpired().then((data) => setExpired(data || []));
+}, []);
 
+const fetchRecords = async () => {
+  try {
+    const response = await fetch("/api/getClient");
+    if (!response.ok) throw new Error("Failed to fetch records");
+    return await response.json();
+  } catch (err) {
+    console.error(err.message);
+  }
+};
 
+const fetchPending = async () => {
+  try {
+    const response = await fetch("/api/getPending");
+    if (!response.ok) throw new Error("Failed to fetch pending");
+    return await response.json();
+    
+  } catch (err) {
+    console.error(err.message);
+  }
+};
 
-  const fetchRecords = async () => {
-    try {
-      const response = await fetch("/api/getClient");
-      if (!response.ok) throw new Error("Failed to fetch records");
-      return await response.json();
-    } catch (err) {
-      console.error(err.message);
-    }
-  };
-
-  const fetchPending = async () => {
-    try {
-      const response = await fetch("/api/getPending");
-      if (!response.ok) throw new Error("Failed to fetch pending");
-      return await response.json();
-      
-    } catch (err) {
-      console.error(err.message);
-    }
-  };
-  
-  const fetchExpired = async () => {
-    try {
-      const response = await fetch("/api/getExpired");
-      if (!response.ok) throw new Error("Failed to fetch expired");
-      return await response.json();
-    } catch (err) {
-      console.error(err.message);
-    }
-  };
+const fetchExpired = async () => {
+  try {
+    const response = await fetch("/api/getExpired");
+    if (!response.ok) throw new Error("Failed to fetch expired");
+    return await response.json();
+  } catch (err) {
+    console.error(err.message);
+  }
+};
 
 
 
@@ -352,6 +356,7 @@ const filteredRecords = useMemo(() => {
     ) || []
   );
 }, [records, pending, expired, tableView, search]);
+
 // Pagination setup
 const rowsPerPage = 5; // 👈 set how many rows per page
 const startIndex = (currentPage[tableView] - 1) * rowsPerPage;
@@ -384,13 +389,142 @@ useEffect(() => {
 
   fetchViolations();
 }, [filteredRecords]); // now stable because of useMemo
+
+
+// For Dropdown
+
+const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function onClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  // Close on Esc
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+
+
 return (
-  <div className="space-y-6">
+  <div className="space-y-6 p-1">
+
+    {/* Stats Section */}
+    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ">
+      <div
+        className="bg-white p-4 sm:p-6 rounded dashboard-cards flex justify-between items-center "
+        
+      >
+         {/* onClick={() => setTableView("all")} */}
+         <div>
+           <p className="text-lg sm:text-sm font-normal">CLIENTS</p>
+        <h2 className="mt-1 text-gray-600 text-sm sm:text-3xl">
+          {records?.length}
+        </h2>
+         </div>
+       
+         <div>
+          <FaUsers size={50} className="text-blue-400"/>
+        </div>
+      </div>
+      <div
+        className="bg-white p-4 sm:p-6 rounded dashboard-cards flex justify-between items-center"
+        
+      >
+        {/* onClick={() => setTableView("pending")} */}
+        <div>
+        <div className="flex items-center gap-5">
+        <h2 className="text-lg sm:text-sm font-normal">PAID</h2>
+        <p className=" text-gray-600 text-sm sm:text-xl">
+           {pending?.length}
+        </p>
+        </div>
+        <div>
+          <p className=" text-gray-600 text-sm sm:text-3xl font-bold">
+          ₱ 10,000.00
+        </p>
+        <p className=" text-gray-600 text-sm sm:text-sx italic mt-2">
+          This Year, 2025
+        </p>
+        </div>
+        </div>
+        
+         <div>
+          <MdPaid size={50} className="text-green-500"/>
+        </div>
+        
+      </div>
+      <div
+        className="bg-white p-4 sm:p-6 rounded dashboard-cards flex justify-between items-center"
+        
+      >
+        {/* onClick={() => setTableView("pending")} */}
+        <div>
+        <div className="flex items-center gap-5">
+        <h2 className="text-lg sm:text-sm font-normal">NOT PAID</h2>
+        <p className=" text-gray-600 text-sm sm:text-xl">
+           {pending?.length}
+        </p>
+        </div>
+        <div>
+          <p className=" text-gray-600 text-sm sm:text-3xl font-bold">
+          ₱ 5,000.00
+        </p>
+        <p className=" text-gray-600 text-sm sm:text-sx italic">
+          August 2025
+        </p>
+        </div>
+        </div>
+        
+        <div>
+          <MdPaid size={50} className="text-red-500"/>
+        </div>
+      </div>
+      <div
+        className="bg-white p-4 sm:p-6 rounded dashboard-cards flex items-center justify-between"
+     
+      >
+           {/* onClick={() => setTableView("expired")} */}
+          <div>
+            <div className="flex items-center gap-5">
+            <h2 className="text-lg sm:text-sm font-normal text-red-600">EXPIRED</h2>
+            <p className=" text-gray-600 text-sm sm:text-xl">
+              {expired.length} 
+            </p>
+            </div>
+            <div>
+              <p className=" text-gray-600 text-sm sm:text-3xl font-bold">
+              ₱ 5,000.00
+            </p>
+            <p className=" text-gray-600 text-sm sm:text-sx italic ">
+              August 2025
+            </p>
+            </div>
+          </div>
+        
+        <div>
+          <IoIosWarning size={50} className="text-red-600"/>
+        </div>
+        
+      </div>
+    </section>
+
+
     {/* Search Bar */}
-    <div className="flex gap-2">
+    <div className="flex gap-2 ">
       <input
         type="text"
-        placeholder="Search clients..."
+        placeholder="Looking for a clients…"
         value={searchInput}
         onChange={handleInputChange}
         className="border p-2 w-full rounded"
@@ -404,40 +538,10 @@ return (
     </div>
 
 
-    {/* Stats Section */}
-    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div
-        className="bg-white p-4 sm:p-6 rounded shadow cursor-pointer"
-        onClick={() => setTableView("all")}
-      >
-        <h2 className="text-lg sm:text-xl font-semibold">Clients</h2>
-        <p className="mt-1 text-gray-600 text-sm sm:text-base">
-          Number of registered clients: {records?.length}
-        </p>
-      </div>
-      <div
-        className="bg-white p-4 sm:p-6 rounded shadow cursor-pointer"
-        onClick={() => setTableView("pending")}
-      >
-        <h2 className="text-lg sm:text-xl font-semibold">Not Paid</h2>
-        <p className="mt-1 text-gray-600 text-sm sm:text-base">
-          Number of unpaid clients: {pending?.length}
-        </p>
-      </div>
-      <div
-        className="bg-white p-4 sm:p-6 rounded shadow cursor-pointer"
-        onClick={() => setTableView("expired")}
-      >
-        <h2 className="text-lg sm:text-xl font-semibold text-red-600">Expired</h2>
-        <p className="mt-1 text-gray-600 text-sm sm:text-base">
-          {expired.length} expired
-        </p>
-      </div>
-    </section>
-
+    
     {/* Table */}
-    <div className="bg-white rounded shadow p-4 sm:p-6 overflow-x-auto">
-      <h2
+    <div className="bg-white rounded p-2 lg:p-4 overflow-x-auto flex flex-col gap-4 dashboard-cards">
+      {/* <h2
         className={`text-lg sm:text-xl font-semibold mb-4 ${
           tableView === "expired" ? "text-red-600" : "text-gray-800"
         }`}
@@ -447,23 +551,37 @@ return (
           : tableView === "pending"
           ? "Not Paid Clients"
           : "Expired Clients"}
-      </h2>
+      </h2> */}
+
+          <div className="space-y-4">
+      {/* Dropdown */}
+      <select
+        value={tableView}
+        onChange={(e) => setTableView(e.target.value)}
+        className="border border-gray-300 rounded-md px-3 py-2 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="all">All Clients</option>
+        <option value="pending">Not Paid Clients</option>
+        <option value="expired">Expired Clients</option>
+      </select>
+    </div>
+
       <table className="min-w-full border border-gray-200 text-sm sm:text-base">
-        <thead className="hidden sm:table-header-group">
+        <thead className="hidden md:table-header-group">
           <tr className="bg-gray-100">
-            <th className="border px-2 sm:px-4 py-2 text-left">Name</th>
-            <th className="border px-2 sm:px-4 py-2 text-left">Violations</th>
-            <th className="border px-2 sm:px-4 py-2 text-left">
+            <th class=" text-left px-3 py-2 w-[20%]">Name</th>
+            <th class=" text-left px-3 py-2 w-[10%]">Violations</th>
+            <th class=" text-left px-3 py-2 w-[30%]">
               {tableView === "pending" || tableView === "expired"
                 ? "Date"
                 : "Address"}
             </th>
-            <th className="border px-2 sm:px-4 py-2 text-left">
+            <th class=" text-left px-3 py-2 w-[20%]">
               {tableView === "pending" || tableView === "expired"
                 ? "Time"
                 : "License No"}
             </th>
-            <th className="border px-2 sm:px-4 py-2 text-left">Action</th>
+            <th class=" text-left px-3 py-2 w-[20%]">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -476,25 +594,20 @@ return (
               return (
                 <tr
                   key={idx}
-                  className="block sm:table-row border-b sm:border-0 sm:hover:bg-gray-50"
+                  class="block md:table-row border-b md:border-0 md:hover:bg-gray-50 border"
                 >
                   {/* Mobile stacked row */}
-                  <td className="block sm:table-cell px-2 sm:px-4 py-2 font-medium sm:font-normal">
-                    <span className="sm:hidden font-semibold">Name: </span>
+                  <td class="block md:table-cell px-2 md:px-4 py-2 font-medium md:font-normal">
+                    <span class="md:hidden font-semibold">Name: </span>
                     {client.name}
                   </td>
-                  <td className="block sm:table-cell px-2 sm:px-4 py-2">
-                    <span className="sm:hidden font-semibold">Violations: </span>
+                  <td class="block md:table-cell px-2 md:px-4 py-2">
+                    <span className="md:hidden font-semibold">Violations: </span>
                     {client.violation_count ?? "Loading..."}
-                    <button
-                      className="ml-2 rounded bg-blue-600 px-2 sm:px-3 py-1 text-white text-xs sm:text-sm font-medium shadow hover:bg-blue-700 transition"
-                      onClick={() => handleViewClick(client)}
-                    >
-                      View
-                    </button>
+                    
                   </td>
-                  <td className="block sm:table-cell px-2 sm:px-4 py-2">
-                    <span className="sm:hidden font-semibold">
+                  <td class="block md:table-cell px-2 md:px-4 py-2">
+                    <span className="md:hidden font-semibold">
                       {tableView === "pending" || tableView === "expired"
                         ? "Date: "
                         : "Address: "}
@@ -503,8 +616,8 @@ return (
                       ? client.date
                       : client.address}
                   </td>
-                  <td className="block sm:table-cell px-2 sm:px-4 py-2">
-                    <span className="sm:hidden font-semibold">
+                  <td class="block md:table-cell px-2 md:px-4 py-2">
+                    <span className="md:hidden font-semibold">
                       {tableView === "pending" || tableView === "expired"
                         ? "Time: "
                         : "License No: "}
@@ -513,11 +626,11 @@ return (
                       ? client.time
                       : client.license_no}
                   </td>
-                  <td className="block sm:table-cell px-2 sm:px-4 py-2 space-x-2">
+                  <td class="block md:table-cell px-2 md:px-4 py-2">
                     {/* Only show Pay if tableView is expired or pending */}
                     {(tableView === "expired" || tableView === "pending") && (
                       <button
-                        className="bg-blue-600 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm rounded hover:bg-blue-500"
+                        class="bg-blue-600 text-white px-4 py-1 text-sm  rounded font-medium hover:bg-blue-500 mx-1"
                         onClick={() => handleViewClient(client)}
                       >
                         Pay
@@ -525,10 +638,17 @@ return (
                     )}
 
                     <button
-                      className="bg-blue-600 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm rounded hover:bg-blue-500"
+                      className="bg-blue-600 text-white px-4 py-1 text-sm  rounded font-medium hover:bg-blue-500 mx-1"
                       onClick={() => handlePrintClient(client)}
                     >
                       Print
+                    </button>
+
+                    <button
+                      className="rounded bg-blue-600 px-4 py-1 text-white text-sm  font-medium shadow hover:bg-blue-700 transition mx-1"
+                      onClick={() => handleViewClick(client)}
+                    >
+                      View Violations
                     </button>
                   </td>
 
@@ -548,6 +668,10 @@ return (
         </tbody>
       </table>
     </div>
+
+
+ 
+    
 
     {/* Pagination Controls */}
     {totalPages > 1 && (
@@ -597,104 +721,122 @@ return (
         </button>
       </div>
     )}
+
     {/* View Violations Modal */}
-{isViewViolationOpen && selectedClient && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full">
-      <h2 className="text-lg font-semibold mb-4">Violations</h2>
+    {isViewViolationOpen && selectedClient && (
+      <div className="absolute left-0  -top-6  bg-black/50 flex items-center justify-center z-50 w-full h-screen">
+        <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full mx-4 flex flex-col gap-4">
+          <div class="flex flex-row justify-between items-center ">
+              <h2 className="text-lg font-semibold ">Violations</h2>
+              <button
+              onClick={() => setIsViewViolationOpen(false)}
+              className="">
+             <svg class="hover:fill-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="m16.192 6.344-4.243 4.242-4.242-4.242-1.414 1.414L10.535 12l-4.242 4.242 1.414 1.414 4.242-4.242 4.243 4.242 1.414-1.414L13.364 12l4.242-4.242z"></path></svg>
+            </button>
+          </div>
 
-      {loading ? (
-        <p>Loading...</p>
-      ) : error ? (
-        <p className="text-red-600">{error}</p>
-      ) : (
-        <>
-          {violations && violations.length > 0 ? (
-            <ul className="list-disc pl-5 space-y-1 mb-4">
-              {violations.map((vio, idx) => (
-                <li key={idx}>
-                  {vio.violation_desc || "No description"}{" "}
-                  {vio.offense_label && (
-                    <span className="text-gray-500 text-sm">
-                      ({vio.offense_label})
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
+          {loading ? (
+            <p>Loading...</p>
+          ) : error ? (
+            <p className="text-red-600">{error}</p>
           ) : (
-            <p>No violations found.</p>
+            <>
+              {violations && violations.length > 0 ? (
+                <ul className="list-none divide-y divide-gray-200 rounded-xl border bg-white border-l-4 border-blue-400">
+                    {violations.map((vio, idx) => (
+                      <li
+                        key={idx}
+                        className="px-4 py-3  flex items-center justify-between"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-gray-900">
+                            {vio.violation_desc || "No description"}
+                          </span>
+                          {vio.offense_label && (
+                            <span className="text-xs text-gray-500">{vio.offense_label}</span>
+                          )}
+                        </div>
+
+                        {vio.fine_amount != null && (
+                          <span className="text-xs font-semibold text-red-600">
+                            ₱{vio.fine_amount}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+
+              ) : (
+                <p>No violations found.</p>
+              )}
+
+              {penaltyValue && (
+               <p className="mt-4 px-4 py-2 rounded-lg bg-gray-50 text-gray-700 text-sm flex items-center justify-between">
+  <strong className="font-semibold text-gray-900">Total Penalty:</strong>
+  <span className="text-red-600 font-bold">
+    ₱ {penaltyValue[0]?.total_penalty ?? 0}
+  </span>
+</p>
+
+              )}
+            </>
           )}
 
-          {penaltyValue && (
-            <p className="mt-4">
-              <strong>Total Penalty:</strong> ₱ {penaltyValue[0]?.total_penalty}
-            </p>
-          )}
-        </>
-      )}
-
-      <div className="flex justify-end mt-6">
-        <button
-          onClick={() => setIsViewViolationOpen(false)}
-          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
-        >
-          Close
-        </button>
+         
+        </div>
       </div>
-    </div>
-  </div>
-)}
-{showConfirm && selectedClient && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
-      <h2 className="text-lg font-semibold mb-4">Confirm Payment</h2>
-      <p className="mb-6">
-        Are you sure you want to confirm payment for{" "}
-        <span className="font-bold">{selectedClient.name}</span>?
-      </p>
+    )}
 
-      {/* Payment Date */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">Payment Date</label>
-        <input
-          type="date"
-          value={paymentDate}
-          onChange={(e) => setPaymentDate(e.target.value)}
-          className="w-full border rounded p-2"
-        />
-      </div>
+    {showConfirm && selectedClient && (
+      <div class="absolute left-0  -top-6  bg-black/50 flex items-center justify-center z-50 w-full h-screen">
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4 flex flex-col gap-6">
+          
+          <div class="text-gray-600 flex  flex-col gap-2">
+            <h2 class="text-lg font-bold">Confirm Payment</h2>
+            <p> Record payment details for <span class="font-bold text-black">{selectedClient.name}</span></p>
+          </div>
 
-      {/* OR Number */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium mb-1">OR Number</label>
-        <input
-          type="text"
-          placeholder="Enter OR No."
-          value={orNumber}
-          onChange={(e) => setOrNumber(e.target.value)}
-          className="w-full border rounded p-2"
-        />
-      </div>
+          {/* Payment Date */}
+          <div class="space-y-2">
+            <label className="block text-sm font-medium mb-1">Payment Date</label>
+            <input
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              className="w-full border rounded p-2"
+            />
+          </div>
 
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => setShowConfirm(false)}
-          className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={confirmPay}
-          disabled={loading || !paymentDate || !orNumber}
-          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? "Processing..." : "Confirm"}
-        </button>
+          {/* OR Number */}
+          <div class="space-y-2">
+            <label className="block text-sm font-medium mb-1">OR Number</label>
+            <input
+              type="text"
+              placeholder="Enter OR No."
+              value={orNumber}
+              onChange={(e) => setOrNumber(e.target.value)}
+              className="w-full border rounded p-2"
+            />
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <button
+              onClick={() => setShowConfirm(false)}
+              className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmPay}
+              disabled={loading || !paymentDate || !orNumber}
+              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "Processing..." : "Confirm"}
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-)}
+    )}
 
   </div>
   
